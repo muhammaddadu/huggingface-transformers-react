@@ -1,0 +1,103 @@
+{
+  "name": "huggingface-transformers-react",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "A React provider and hooks for using Hugging Face Transformers.js in React applications with built-in loading states, error handling, and Suspense support",
+  "main": "dist/index.js",
+  "module": "dist/index.esm.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "rollup -c",
+    "build:docs": "typedoc",
+    "dev": "rollup -c -w",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "lint": "eslint src --ext .ts,.tsx --fix",
+    "type-check": "tsc --noEmit",
+    "prepublishOnly": "npm run build && npm run test && npm run lint",
+    "docs:dev": "typedoc --watch",
+    "docs:build": "typedoc && npm run build:examples",
+    "build:examples": "cd examples && npm run build",
+    "release": "semantic-release"
+  },
+  "keywords": [
+    "react",
+    "huggingface",
+    "transformers",
+    "machine-learning",
+    "ai",
+    "nlp",
+    "sentiment-analysis",
+    "speech-recognition",
+    "context",
+    "hooks",
+    "typescript",
+    "suspense"
+  ],
+  "author": {
+    "name": "Muhammad Dadu",
+    "email": "muhammad@dadu.io",
+    "url": "https://github.com/muhammaddadu"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/muhammaddadu/huggingface-transformers-react.git"
+  },
+  "bugs": {
+    "url": "https://github.com/muhammaddadu/huggingface-transformers-react/issues"
+  },
+  "homepage": "https://muhammaddadu.github.io/huggingface-transformers-react",
+  "peerDependencies": {
+    "react": ">=19.1.0",
+    "react-dom": ">=19.1.0"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.25.8",
+    "@babel/preset-env": "^7.25.8",
+    "@babel/preset-react": "^7.25.7",
+    "@babel/preset-typescript": "^7.25.7",
+    "@rollup/plugin-babel": "^6.0.4",
+    "@rollup/plugin-commonjs": "^28.0.1",
+    "@rollup/plugin-node-resolve": "^15.3.0",
+    "@rollup/plugin-terser": "^0.4.4",
+    "@rollup/plugin-typescript": "^12.1.1",
+    "@semantic-release/changelog": "^6.0.3",
+    "@semantic-release/git": "^10.0.1",
+    "@testing-library/jest-dom": "^6.6.3",
+    "@testing-library/react": "^16.1.0",
+    "@testing-library/user-event": "^14.5.2",
+    "@types/jest": "^29.5.14",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "eslint": "^9.28.0",
+    "eslint-plugin-jest": "^28.13.0",
+    "eslint-plugin-react": "^7.37.2",
+    "eslint-plugin-react-hooks": "^5.0.0",
+    "jest": "^29.7.0",
+    "jest-environment-jsdom": "^29.7.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "rollup": "^4.28.1",
+    "rollup-plugin-dts": "^6.1.1",
+    "rollup-plugin-peer-deps-external": "^2.2.4",
+    "semantic-release": "^24.2.0",
+    "tslib": "^2.8.1",
+    "typedoc": "^0.28.5",
+    "typedoc-plugin-markdown": "^4.3.1",
+    "typescript": "^5.7.2",
+    "typescript-eslint": "^8.17.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}
