@@ -1,5 +1,6 @@
 {
   "entryPoints": ["src/index.tsx"],
+  "name": "Hugging Face Transformers React",
   "out": "docs",
   "theme": "default",
   "includeVersion": true,
@@ -7,9 +8,7 @@
   "excludeProtected": true,
   "excludeExternals": true,
   "readme": "README.md",
-  "name": "Hugging Face Transformers React",
   "tsconfig": "tsconfig.json",
-  "plugin": ["typedoc-plugin-markdown"],
   "gitRevision": "main",
   "gitRemote": "origin",
   "hideGenerator": true,
