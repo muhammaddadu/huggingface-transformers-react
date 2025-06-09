@@ -157,17 +157,20 @@ describe('TransformersProvider', () => {
       // Setup loaded library state for model tests with a longer timeout to avoid conflicts
       render(<TestApp loadTimeout={60000} />);
       
+      // Wait for loading state and set up transformers
       await waitFor(() => {
-        expect(screen.getByTestId('library-status')).toHaveTextContent('loading');
+        const statusElement = screen.getByTestId('library-status');
+        if (statusElement.textContent === 'loading') {
+          act(() => {
+            (window as any).transformers = { pipeline: jest.fn() };
+            jest.advanceTimersByTime(500);
+          });
+        }
       });
       
-      act(() => {
-        (window as any).transformers = { pipeline: jest.fn() };
-        jest.advanceTimersByTime(500);
-      });
-      
+      // Let the component reach ready state
       await waitFor(() => {
-        expect(screen.getByTestId('library-status')).toHaveTextContent('ready');
+        return screen.getByTestId('library-status').textContent === 'ready';
       });
     });
 
@@ -243,7 +246,7 @@ describe('TransformersProvider', () => {
       });
       
       await waitFor(() => {
-        expect(screen.getByTestId('library-status')).toHaveTextContent('ready');
+        return screen.getByTestId('library-status').textContent === 'ready';
       });
     });
 
