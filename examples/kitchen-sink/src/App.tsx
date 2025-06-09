@@ -137,8 +137,8 @@ function ModelTestingCard() {
     { id: '1', type: 'bot', content: 'Enter a Hugging Face model name and I\'ll test it for you. I\'ll show you the raw JSON response.', timestamp: new Date() }
   ]);
   const [inputText, setInputText] = useState('');
-  const [modelName, setModelName] = useState('Xenova/distilbert-base-uncased-finetuned-sst-2-english');
-  const [taskType, setTaskType] = useState('sentiment-analysis');
+  const [modelName, setModelName] = useState('HuggingFaceTB/SmolLM2-135M-Instruct');
+  const [taskType, setTaskType] = useState('text-generation');
   const [busy, setBusy] = useState(false);
 
   const testModel = async (text: string, model: string, task: string) => {
