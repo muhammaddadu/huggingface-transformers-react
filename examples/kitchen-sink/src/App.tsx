@@ -44,7 +44,7 @@ import {
   HourglassTop as HourglassIcon,
   Error as ErrorIcon,
 } from '@mui/icons-material';
-import { Brain, Sparkles } from 'lucide-react';
+import { Brain, Sparkles, MessageSquare } from 'lucide-react';
 
 /* ─────────────────────────── Theme ─────────────────────────── */
 
@@ -130,6 +130,216 @@ function useVoiceRecorder() {
 }
 
 /* ─────────────────────── Feature Cards ────────────────────── */
+
+function ModelTestingCard() {
+  const { libraryStatus, loadModel } = useTransformers();
+  const [messages, setMessages] = useState<Array<{id: string, type: 'user' | 'bot', content: string, timestamp: Date}>>([
+    { id: '1', type: 'bot', content: 'Enter a Hugging Face model name and I\'ll test it for you. I\'ll show you the raw JSON response.', timestamp: new Date() }
+  ]);
+  const [inputText, setInputText] = useState('');
+  const [modelName, setModelName] = useState('Xenova/distilbert-base-uncased-finetuned-sst-2-english');
+  const [taskType, setTaskType] = useState('sentiment-analysis');
+  const [busy, setBusy] = useState(false);
+
+  const testModel = async (text: string, model: string, task: string) => {
+    setBusy(true);
+    try {
+      // Load the specified model
+      const modelPipeline = await loadModel<(text: string, options?: any) => Promise<any>>(`${model}`, task);
+      const result = await modelPipeline(text, {
+        max_length: 150,
+        min_length: 30,
+        do_sample: false,
+      });
+      console.log('Model result:', result);
+      return result;
+    } catch (error: any) {
+      console.error('Model error:', error);
+      throw error;
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleSendMessage = async () => {
+    if (!inputText.trim() || !modelName.trim() || busy) return;
+
+    const userMessage = {
+      id: Date.now().toString(),
+      type: 'user' as const,
+      content: `Model: ${modelName}\nTask: ${taskType}\nInput: ${inputText}`,
+      timestamp: new Date()
+    };
+
+    setMessages(prev => [...prev, userMessage]);
+    const currentInput = inputText;
+    const currentModel = modelName;
+    const currentTask = taskType;
+    setInputText('');
+
+    try {
+      // Test the model
+      const result = await testModel(currentInput, currentModel, currentTask);
+      
+      const botMessage = {
+        id: (Date.now() + 1).toString(),
+        type: 'bot' as const,
+        content: `✅ Success! Raw JSON response:\n\n${JSON.stringify(result, null, 2)}`,
+        timestamp: new Date()
+      };
+
+      setMessages(prev => [...prev, botMessage]);
+    } catch (error: any) {
+      const errorMessage = {
+        id: (Date.now() + 1).toString(),
+        type: 'bot' as const,
+        content: `❌ Error: ${error.message}`,
+        timestamp: new Date()
+      };
+
+      setMessages(prev => [...prev, errorMessage]);
+    }
+  };
+
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSendMessage();
+    }
+  };
+
+  return (
+    <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+      <CardHeader
+        avatar={
+          <Avatar sx={{ bgcolor: 'info.main' }}>
+            <MessageSquare size={20} />
+          </Avatar>
+        }
+        title="AI Model Testing"
+        subheader="Test any Hugging Face model and see raw JSON responses"
+      />
+      <CardContent sx={{ flex: 1, display: 'flex', flexDirection: 'column', p: 0 }}>
+        {/* Model Configuration */}
+        <Box sx={{ p: 2, borderBottom: 1, borderColor: 'divider' }}>
+          <Stack spacing={2}>
+            <TextField
+              fullWidth
+              label="Model Name"
+              placeholder="e.g., kartmannXu/MiniCPM-2B-128k-pruned-0.3-onnx"
+              value={modelName}
+              onChange={(e) => setModelName(e.target.value)}
+              disabled={busy}
+              variant="outlined"
+              size="small"
+            />
+            <TextField
+              fullWidth
+              label="Task Type"
+              placeholder="e.g., text2text-generation, text-generation, summarization"
+              value={taskType}
+              onChange={(e) => setTaskType(e.target.value)}
+              disabled={busy}
+              variant="outlined"
+              size="small"
+            />
+          </Stack>
+        </Box>
+
+        {/* Messages area */}
+        <Box
+          sx={{
+            flex: 1,
+            overflowY: 'auto',
+            p: 2,
+            maxHeight: 400,
+            minHeight: 300,
+          }}
+        >
+          {messages.map((message) => (
+            <Box
+              key={message.id}
+              sx={{
+                display: 'flex',
+                justifyContent: message.type === 'user' ? 'flex-end' : 'flex-start',
+                mb: 2,
+              }}
+            >
+              <Paper
+                sx={{
+                  p: 1.5,
+                  maxWidth: '85%',
+                  bgcolor: message.type === 'user' ? 'primary.main' : 'grey.100',
+                  color: message.type === 'user' ? 'white' : 'text.primary',
+                  borderRadius: message.type === 'user' ? '16px 16px 4px 16px' : '16px 16px 16px 4px',
+                }}
+              >
+                <Typography 
+                  variant="body2" 
+                  sx={{ 
+                    wordBreak: 'break-word',
+                    whiteSpace: 'pre-wrap',
+                    fontFamily: message.content.includes('JSON response') ? 'monospace' : 'inherit',
+                    fontSize: message.content.includes('JSON response') ? '0.75rem' : 'inherit'
+                  }}
+                >
+                  {message.content}
+                </Typography>
+                <Typography
+                  variant="caption"
+                  sx={{
+                    opacity: 0.7,
+                    display: 'block',
+                    textAlign: 'right',
+                    mt: 0.5,
+                  }}
+                >
+                  {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </Typography>
+              </Paper>
+            </Box>
+          ))}
+          {busy && (
+            <Box sx={{ display: 'flex', justifyContent: 'flex-start', mb: 2 }}>
+              <Paper sx={{ p: 1.5, bgcolor: 'grey.100', borderRadius: '16px 16px 16px 4px' }}>
+                <Stack direction="row" spacing={1} alignItems="center">
+                  <Typography variant="body2">Testing model...</Typography>
+                  <LinearProgress sx={{ width: 100, height: 4 }} />
+                </Stack>
+              </Paper>
+            </Box>
+          )}
+        </Box>
+
+        {/* Input area */}
+        <Box sx={{ p: 2, borderTop: 1, borderColor: 'divider' }}>
+          <Stack direction="row" spacing={1}>
+            <TextField
+              fullWidth
+              multiline
+              maxRows={4}
+              placeholder="Enter text to send to the model..."
+              value={inputText}
+              onChange={(e) => setInputText(e.target.value)}
+              onKeyPress={handleKeyPress}
+              disabled={busy || libraryStatus !== 'ready'}
+              variant="outlined"
+              size="small"
+            />
+            <Button
+              variant="contained"
+              onClick={handleSendMessage}
+              disabled={!inputText.trim() || !modelName.trim() || busy || libraryStatus !== 'ready'}
+              sx={{ minWidth: 'auto', px: 2 }}
+            >
+              <Sparkles size={16} />
+            </Button>
+          </Stack>
+        </Box>
+      </CardContent>
+    </Card>
+  );
+}
 
 function LibraryStatusCard() {
   const { libraryStatus, isLibraryLoaded, models } = useTransformers();
@@ -384,7 +594,7 @@ export function App() {
               AI-powered React Components
             </Typography>
             <Typography variant="h6" color="text.secondary" maxWidth={600} mx="auto">
-              Showcase of sentiment, speech-to-text & custom models
+              Showcase of sentiment analysis, speech-to-text & AI model testing
             </Typography>
           </Box>
 
@@ -400,6 +610,11 @@ export function App() {
             </Grid>
             <Grid item xs={12} md={6}>
               <TranscriptionCard />
+            </Grid>
+            
+            {/* Model Testing */}
+            <Grid item xs={12}>
+              <ModelTestingCard />
             </Grid>
           </Grid>
 
