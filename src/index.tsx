@@ -16,6 +16,21 @@ export interface SentimentResult {
   score: number;
 }
 
+export interface ImageSegmentationResult {
+  label: string;
+  score: number;
+  mask: any; // Could be tensor data or image mask
+}
+
+export interface ImageCaptionResult {
+  generated_text: string;
+}
+
+export interface ImageClassificationResult {
+  label: string;
+  score: number;
+}
+
 export interface TransformersProviderProps {
   children: ReactNode;
   moduleUrl?: string;          // ESM build URL
@@ -55,6 +70,24 @@ interface TransformersContextValue {
     options?: Record<string, any>
   ) => Promise<any>;
 
+  segmentImage: (
+    image: string | File | Blob,
+    customModel?: string,
+    options?: Record<string, any>
+  ) => Promise<ImageSegmentationResult[]>;
+
+  captionImage: (
+    image: string | File | Blob,
+    customModel?: string,
+    options?: Record<string, any>
+  ) => Promise<ImageCaptionResult[]>;
+
+  classifyImage: (
+    image: string | File | Blob,
+    customModel?: string,
+    options?: Record<string, any>
+  ) => Promise<ImageClassificationResult[]>;
+
   /** Suspense-ready promise that resolves when transformers.js is ready */
   readyPromise: Promise<void>;
 }
@@ -62,7 +95,7 @@ interface TransformersContextValue {
 /* ───────────────────────── Defaults ─────────────────────────── */
 
 const DEFAULT_MODULE_URL =
-  "https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.5.2";
+  "https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.7.2";
 const DEFAULT_LOAD_TIMEOUT = 60_000;          // 60 s
 const DEFAULT_MAX_RETRIES = 3;
 const BACKOFF_CAP = 60_000;         // max 60 s delay
@@ -342,6 +375,51 @@ export function TransformersProvider({
     [loadModel]
   );
 
+  const segmentImage = useCallback(
+    async (
+      image: string | File | Blob,
+      customModel?: string,
+      options: Record<string, any> = {}
+    ): Promise<ImageSegmentationResult[]> => {
+      const pipe = await loadModel<(...a: any[]) => Promise<ImageSegmentationResult[]>>(
+        customModel || "Xenova/detr-resnet-50-panoptic",
+        "image-segmentation"
+      );
+      return pipe(image, options);
+    },
+    [loadModel]
+  );
+
+  const captionImage = useCallback(
+    async (
+      image: string | File | Blob,
+      customModel?: string,
+      options: Record<string, any> = {}
+    ): Promise<ImageCaptionResult[]> => {
+      const pipe = await loadModel<(...a: any[]) => Promise<ImageCaptionResult[]>>(
+        customModel || "Xenova/vit-gpt2-image-captioning",
+        "image-to-text"
+      );
+      return pipe(image, options);
+    },
+    [loadModel]
+  );
+
+  const classifyImage = useCallback(
+    async (
+      image: string | File | Blob,
+      customModel?: string,
+      options: Record<string, any> = {}
+    ): Promise<ImageClassificationResult[]> => {
+      const pipe = await loadModel<(...a: any[]) => Promise<ImageClassificationResult[]>>(
+        customModel || "Xenova/vit-base-patch16-224",
+        "image-classification"
+      );
+      return pipe(image, options);
+    },
+    [loadModel]
+  );
+
   /* ── context value ───────────────────────────────────────── */
 
   const ctx: TransformersContextValue = {
@@ -355,6 +433,9 @@ export function TransformersProvider({
     unloadModel,
     analyzeSentiment,
     transcribeAudio,
+    segmentImage,
+    captionImage,
+    classifyImage,
     readyPromise: readyPromiseRef.current!,
   };
 

@@ -127,7 +127,7 @@ npm start
 
 ```bash
 # Generate API documentation
-npm run build:docs
+npm run docs:build
 
 # Start documentation development server
 npm run docs:dev

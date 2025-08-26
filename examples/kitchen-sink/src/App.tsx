@@ -10,6 +10,9 @@ import {
   TransformersProvider,
   useTransformers,
   type SentimentResult,
+  type ImageSegmentationResult,
+  type ImageCaptionResult,
+  type ImageClassificationResult,
 } from 'huggingface-transformers-react';
 import {
   ThemeProvider,
@@ -43,6 +46,9 @@ import {
   CheckCircle as CheckCircleIcon,
   HourglassTop as HourglassIcon,
   Error as ErrorIcon,
+  Image as ImageIcon,
+  Description as DescriptionIcon,
+  Category as CategoryIcon,
 } from '@mui/icons-material';
 import { Brain, Sparkles, MessageSquare } from 'lucide-react';
 
@@ -561,6 +567,581 @@ function TranscriptionCard() {
   );
 }
 
+function ImageSegmentationCard() {
+  const { libraryStatus, segmentImage } = useTransformers();
+  const [file, setFile] = useState<File | null>(null);
+  const [imageUrl, setImageUrl] = useState<string>('');
+  const [result, setResult] = useState<ImageSegmentationResult[] | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [modelName, setModelName] = useState('Xenova/detr-resnet-50-panoptic');
+
+  /* handle file upload */
+  const onChoose = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0];
+    if (f) {
+      setFile(f);
+      // Create a URL for preview
+      const url = URL.createObjectURL(f);
+      setImageUrl(url);
+      setResult(null);
+    }
+  };
+
+  /* run image segmentation */
+  const segment = async () => {
+    if (!file && !imageUrl.trim()) return;
+    
+    setBusy(true);
+    try {
+      const input = file || imageUrl.trim();
+      const output = await segmentImage(input, modelName);
+      setResult(output);
+    } catch (e: any) {
+      console.error('Segmentation error:', e);
+      setResult([{ label: 'Error', score: 0, mask: e.message }]);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Card sx={{ height: '100%' }}>
+      <CardHeader
+        avatar={
+          <Avatar sx={{ bgcolor: 'warning.main' }}>
+            <ImageIcon />
+          </Avatar>
+        }
+        title="Image Segmentation"
+        subheader="Segment objects in images and see raw JSON results"
+      />
+      <CardContent>
+        <Stack spacing={2}>
+          {/* Model Selection */}
+          <TextField
+            fullWidth
+            label="Model Name"
+            placeholder="e.g., Xenova/detr-resnet-50-panoptic"
+            value={modelName}
+            onChange={(e) => setModelName(e.target.value)}
+            disabled={busy}
+            variant="outlined"
+            size="small"
+          />
+
+          {/* Image URL Input */}
+          <TextField
+            fullWidth
+            label="Image URL (optional)"
+            placeholder="https://example.com/image.jpg"
+            value={imageUrl}
+            onChange={(e) => setImageUrl(e.target.value)}
+            disabled={busy}
+            variant="outlined"
+            size="small"
+          />
+
+          <Divider>or</Divider>
+
+          {/* File Upload */}
+          <Button
+            fullWidth
+            component="label"
+            variant="outlined"
+            startIcon={<CloudUploadIcon />}
+            disabled={libraryStatus !== 'ready' || busy}
+          >
+            {file ? file.name : 'Upload image file'}
+            <input
+              hidden
+              type="file"
+              accept="image/*"
+              onChange={onChoose}
+            />
+          </Button>
+
+          {/* Image Preview */}
+          {(file || imageUrl) && (
+            <Box sx={{ textAlign: 'center', mt: 2 }}>
+              <img
+                src={file ? URL.createObjectURL(file) : imageUrl}
+                alt="Preview"
+                style={{
+                  maxWidth: '100%',
+                  maxHeight: 200,
+                  objectFit: 'contain',
+                  borderRadius: 8,
+                  border: '1px solid #ddd'
+                }}
+              />
+            </Box>
+          )}
+
+          {/* Segment Button */}
+          <Button
+            fullWidth
+            variant="contained"
+            disabled={libraryStatus !== 'ready' || busy || (!file && !imageUrl.trim())}
+            onClick={segment}
+            startIcon={<Sparkles size={16} />}
+          >
+            {busy ? 'Segmenting…' : 'Segment Image'}
+          </Button>
+
+          {busy && <LinearProgress />}
+
+          {/* Results */}
+          {result && (
+            <Box mt={3}>
+              <Typography variant="h6" gutterBottom>
+                Segmentation Results (JSON):
+              </Typography>
+              <Paper 
+                sx={{ 
+                  p: 2, 
+                  backgroundColor: '#f5f5f5',
+                  maxHeight: 300,
+                  overflow: 'auto'
+                }}
+              >
+                <Typography
+                  variant="body2"
+                  component="pre"
+                  sx={{
+                    fontFamily: 'monospace',
+                    fontSize: '0.75rem',
+                    whiteSpace: 'pre-wrap',
+                    wordBreak: 'break-word',
+                    margin: 0
+                  }}
+                >
+                  {JSON.stringify(result, null, 2)}
+                </Typography>
+              </Paper>
+              
+              {/* Summary chips */}
+              <Box mt={2}>
+                <Typography variant="subtitle2" gutterBottom>
+                  Detected Objects:
+                </Typography>
+                <Stack direction="row" spacing={1} flexWrap="wrap">
+                  {result.map((item, i) => (
+                    <Chip
+                      key={i}
+                      label={`${item.label} (${(item.score * 100).toFixed(1)}%)`}
+                      size="small"
+                      color="primary"
+                      variant="outlined"
+                      sx={{ mb: 1 }}
+                    />
+                  ))}
+                </Stack>
+              </Box>
+            </Box>
+          )}
+        </Stack>
+      </CardContent>
+    </Card>
+  );
+}
+
+function ImageCaptionCard() {
+  const { libraryStatus, captionImage } = useTransformers();
+  const [file, setFile] = useState<File | null>(null);
+  const [imageUrl, setImageUrl] = useState<string>('');
+  const [result, setResult] = useState<ImageCaptionResult[] | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [modelName, setModelName] = useState('Xenova/vit-gpt2-image-captioning');
+
+  /* handle file upload */
+  const onChoose = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0];
+    if (f) {
+      setFile(f);
+      // Create a URL for preview
+      const url = URL.createObjectURL(f);
+      setImageUrl(url);
+      setResult(null);
+    }
+  };
+
+  /* run image captioning */
+  const caption = async () => {
+    if (!file && !imageUrl.trim()) return;
+    
+    setBusy(true);
+    try {
+      const input = file || imageUrl.trim();
+      const output = await captionImage(input, modelName);
+      setResult(output);
+    } catch (e: any) {
+      console.error('Captioning error:', e);
+      setResult([{ generated_text: `Error: ${e.message}` }]);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Card sx={{ height: '100%' }}>
+      <CardHeader
+        avatar={
+          <Avatar sx={{ bgcolor: 'info.main' }}>
+            <DescriptionIcon />
+          </Avatar>
+        }
+        title="Image Captioning"
+        subheader="Generate text descriptions from images"
+      />
+      <CardContent>
+        <Stack spacing={2}>
+          {/* Model Selection */}
+          <TextField
+            fullWidth
+            label="Model Name"
+            placeholder="e.g., Xenova/vit-gpt2-image-captioning"
+            value={modelName}
+            onChange={(e) => setModelName(e.target.value)}
+            disabled={busy}
+            variant="outlined"
+            size="small"
+          />
+
+          {/* Image URL Input */}
+          <TextField
+            fullWidth
+            label="Image URL (optional)"
+            placeholder="https://example.com/image.jpg"
+            value={imageUrl}
+            onChange={(e) => setImageUrl(e.target.value)}
+            disabled={busy}
+            variant="outlined"
+            size="small"
+          />
+
+          <Divider>or</Divider>
+
+          {/* File Upload */}
+          <Button
+            fullWidth
+            component="label"
+            variant="outlined"
+            startIcon={<CloudUploadIcon />}
+            disabled={libraryStatus !== 'ready' || busy}
+          >
+            {file ? file.name : 'Upload image file'}
+            <input
+              hidden
+              type="file"
+              accept="image/*"
+              onChange={onChoose}
+            />
+          </Button>
+
+          {/* Image Preview */}
+          {(file || imageUrl) && (
+            <Box sx={{ textAlign: 'center', mt: 2 }}>
+              <img
+                src={file ? URL.createObjectURL(file) : imageUrl}
+                alt="Preview"
+                style={{
+                  maxWidth: '100%',
+                  maxHeight: 200,
+                  objectFit: 'contain',
+                  borderRadius: 8,
+                  border: '1px solid #ddd'
+                }}
+              />
+            </Box>
+          )}
+
+          {/* Caption Button */}
+          <Button
+            fullWidth
+            variant="contained"
+            disabled={libraryStatus !== 'ready' || busy || (!file && !imageUrl.trim())}
+            onClick={caption}
+            startIcon={<Sparkles size={16} />}
+          >
+            {busy ? 'Generating Caption…' : 'Generate Caption'}
+          </Button>
+
+          {busy && <LinearProgress />}
+
+          {/* Results */}
+          {result && (
+            <Box mt={3}>
+              <Typography variant="h6" gutterBottom>
+                Generated Caption:
+              </Typography>
+              
+              {result.map((item, i) => (
+                <Paper 
+                  key={i}
+                  sx={{ 
+                    p: 2, 
+                    backgroundColor: item.generated_text.startsWith('Error:') ? '#ffebee' : '#f3f4f6',
+                    mb: 1
+                  }}
+                >
+                  <Typography
+                    variant="body1"
+                    sx={{
+                      fontWeight: 500,
+                      color: item.generated_text.startsWith('Error:') ? 'error.main' : 'text.primary',
+                    }}
+                  >
+                    {item.generated_text}
+                  </Typography>
+                </Paper>
+              ))}
+              
+              {/* Raw JSON for reference */}
+              <Box mt={2}>
+                <Typography variant="subtitle2" gutterBottom>
+                  Raw JSON Response:
+                </Typography>
+                <Paper 
+                  sx={{ 
+                    p: 1.5, 
+                    backgroundColor: '#f5f5f5',
+                    maxHeight: 150,
+                    overflow: 'auto'
+                  }}
+                >
+                  <Typography
+                    variant="body2"
+                    component="pre"
+                    sx={{
+                      fontFamily: 'monospace',
+                      fontSize: '0.7rem',
+                      whiteSpace: 'pre-wrap',
+                      wordBreak: 'break-word',
+                      margin: 0
+                    }}
+                  >
+                    {JSON.stringify(result, null, 2)}
+                  </Typography>
+                </Paper>
+              </Box>
+            </Box>
+          )}
+        </Stack>
+      </CardContent>
+    </Card>
+  );
+}
+
+function ImageClassificationCard() {
+  const { libraryStatus, classifyImage } = useTransformers();
+  const [file, setFile] = useState<File | null>(null);
+  const [imageUrl, setImageUrl] = useState<string>('');
+  const [result, setResult] = useState<ImageClassificationResult[] | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [modelName, setModelName] = useState('Xenova/vit-base-patch16-224');
+  const [topK, setTopK] = useState<number>(3);
+
+  /* handle file upload */
+  const onChoose = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0];
+    if (f) {
+      setFile(f);
+      // Create a URL for preview
+      const url = URL.createObjectURL(f);
+      setImageUrl(url);
+      setResult(null);
+    }
+  };
+
+  /* run image classification */
+  const classify = async () => {
+    if (!file && !imageUrl.trim()) return;
+    
+    setBusy(true);
+    try {
+      const input = file || imageUrl.trim();
+      const options: Record<string, any> = {};
+      if (topK > 0) options.top_k = topK;
+      
+      const output = await classifyImage(input, modelName, options);
+      setResult(output);
+    } catch (e: any) {
+      console.error('Classification error:', e);
+      setResult([{ label: 'Error', score: 0 }]);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Card sx={{ height: '100%' }}>
+      <CardHeader
+        avatar={
+          <Avatar sx={{ bgcolor: 'secondary.main' }}>
+            <CategoryIcon />
+          </Avatar>
+        }
+        title="Image Classification"
+        subheader="Classify objects and scenes in images"
+      />
+      <CardContent>
+        <Stack spacing={2}>
+          {/* Model Selection */}
+          <TextField
+            fullWidth
+            label="Model Name"
+            placeholder="e.g., Xenova/vit-base-patch16-224"
+            value={modelName}
+            onChange={(e) => setModelName(e.target.value)}
+            disabled={busy}
+            variant="outlined"
+            size="small"
+          />
+
+          {/* Top K Selection */}
+          <TextField
+            fullWidth
+            label="Top K Classes (0 = all)"
+            type="number"
+            value={topK}
+            onChange={(e) => setTopK(Math.max(0, parseInt(e.target.value) || 0))}
+            disabled={busy}
+            variant="outlined"
+            size="small"
+            inputProps={{ min: 0, max: 50 }}
+          />
+
+          {/* Image URL Input */}
+          <TextField
+            fullWidth
+            label="Image URL (optional)"
+            placeholder="https://example.com/image.jpg"
+            value={imageUrl}
+            onChange={(e) => setImageUrl(e.target.value)}
+            disabled={busy}
+            variant="outlined"
+            size="small"
+          />
+
+          <Divider>or</Divider>
+
+          {/* File Upload */}
+          <Button
+            fullWidth
+            component="label"
+            variant="outlined"
+            startIcon={<CloudUploadIcon />}
+            disabled={libraryStatus !== 'ready' || busy}
+          >
+            {file ? file.name : 'Upload image file'}
+            <input
+              hidden
+              type="file"
+              accept="image/*"
+              onChange={onChoose}
+            />
+          </Button>
+
+          {/* Image Preview */}
+          {(file || imageUrl) && (
+            <Box sx={{ textAlign: 'center', mt: 2 }}>
+              <img
+                src={file ? URL.createObjectURL(file) : imageUrl}
+                alt="Preview"
+                style={{
+                  maxWidth: '100%',
+                  maxHeight: 200,
+                  objectFit: 'contain',
+                  borderRadius: 8,
+                  border: '1px solid #ddd'
+                }}
+              />
+            </Box>
+          )}
+
+          {/* Classify Button */}
+          <Button
+            fullWidth
+            variant="contained"
+            disabled={libraryStatus !== 'ready' || busy || (!file && !imageUrl.trim())}
+            onClick={classify}
+            startIcon={<Sparkles size={16} />}
+          >
+            {busy ? 'Classifying…' : 'Classify Image'}
+          </Button>
+
+          {busy && <LinearProgress />}
+
+          {/* Results */}
+          {result && (
+            <Box mt={3}>
+              <Typography variant="h6" gutterBottom>
+                Classification Results:
+              </Typography>
+              
+              {result.map((item, i) => (
+                <Paper
+                  key={i}
+                  sx={{
+                    p: 1.5,
+                    mb: 1,
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    backgroundColor: item.label === 'Error' ? '#ffebee' : 'background.paper'
+                  }}
+                >
+                  <Chip
+                    label={item.label}
+                    color={item.label === 'Error' ? 'error' : 'primary'}
+                    size="small"
+                    sx={{ maxWidth: '70%' }}
+                  />
+                  <Typography 
+                    fontWeight={600}
+                    color={item.label === 'Error' ? 'error.main' : 'text.primary'}
+                  >
+                    {item.label === 'Error' ? '' : `${(item.score * 100).toFixed(1)}%`}
+                  </Typography>
+                </Paper>
+              ))}
+              
+              {/* Raw JSON for reference */}
+              <Box mt={2}>
+                <Typography variant="subtitle2" gutterBottom>
+                  Raw JSON Response:
+                </Typography>
+                <Paper 
+                  sx={{ 
+                    p: 1.5, 
+                    backgroundColor: '#f5f5f5',
+                    maxHeight: 200,
+                    overflow: 'auto'
+                  }}
+                >
+                  <Typography
+                    variant="body2"
+                    component="pre"
+                    sx={{
+                      fontFamily: 'monospace',
+                      fontSize: '0.7rem',
+                      whiteSpace: 'pre-wrap',
+                      wordBreak: 'break-word',
+                      margin: 0
+                    }}
+                  >
+                    {JSON.stringify(result, null, 2)}
+                  </Typography>
+                </Paper>
+              </Box>
+            </Box>
+          )}
+        </Stack>
+      </CardContent>
+    </Card>
+  );
+}
+
 /* ─────────────────────────── App ──────────────────────────── */
 
 export function App() {
@@ -594,7 +1175,7 @@ export function App() {
               AI-powered React Components
             </Typography>
             <Typography variant="h6" color="text.secondary" maxWidth={600} mx="auto">
-              Showcase of sentiment analysis, speech-to-text & AI model testing
+              Showcase of sentiment analysis, speech-to-text, image segmentation, image captioning, image classification & AI model testing
             </Typography>
           </Box>
 
@@ -610,6 +1191,17 @@ export function App() {
             </Grid>
             <Grid item xs={12} md={6}>
               <TranscriptionCard />
+            </Grid>
+            
+            {/* Image Processing */}
+            <Grid item xs={12} md={6} lg={4}>
+              <ImageSegmentationCard />
+            </Grid>
+            <Grid item xs={12} md={6} lg={4}>
+              <ImageCaptionCard />
+            </Grid>
+            <Grid item xs={12} md={6} lg={4}>
+              <ImageClassificationCard />
             </Grid>
             
             {/* Model Testing */}

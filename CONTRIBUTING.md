@@ -192,7 +192,7 @@ export function myFunction(param1: string, param2: number): string {
 
 ```bash
 # Build API documentation
-npm run build:docs
+npm run docs:build
 
 # Start documentation development server
 npm run docs:dev
