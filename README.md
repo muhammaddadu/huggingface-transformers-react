@@ -5,7 +5,12 @@
 [![TypeScript](https://img.shields.io/badge/%3C%2F%3E-TypeScript-%230074c1.svg)](http://www.typescriptlang.org/)
 [![React](https://img.shields.io/badge/React-%2320232a.svg?logo=react&logoColor=%2361DAFB)](https://reactjs.org/)
 
-A React provider and hooks for seamlessly integrating [Hugging Face Transformers.js](https://huggingface.co/docs/transformers.js) into your React applications. This library provides intelligent loading states, error handling, model caching, and React Suspense support out of the box.
+A React provider and hooks for seamlessly integrating [Hugging Face Transformers.js](https://huggingface.co/docs/transformers.js) into your React applications. This library provides intelligent loading states, error handling, model caching, React Suspense support, and comprehensive image processing capabilities including segmentation, classification, and captioning.
+
+## 📚 Documentation & Demo
+
+- 📖 **[Complete Documentation](https://muhammaddadu.github.io/huggingface-transformers-react/)** - Full API reference and guides
+- 🎮 **[Live Kitchen Sink Demo](https://muhammaddadu.github.io/huggingface-transformers-react/example)** - Interactive showcase of all features
 
 ## ✨ Features
 
@@ -15,6 +20,10 @@ A React provider and hooks for seamlessly integrating [Hugging Face Transformers
 - ⚡ **Suspense Ready**: Built-in React Suspense support for smooth UX
 - 🛡️ **Error Handling**: Comprehensive error boundaries and recovery
 - 🎵 **Audio Processing**: Automatic audio format conversion for Whisper models
+- 🖼️ **Image Processing**: Complete image analysis suite
+  - **Image Segmentation**: Object detection and segmentation with mask generation
+  - **Image Classification**: Classify objects and scenes with confidence scores
+  - **Image Captioning**: Generate descriptive text from images
 - 🔒 **TypeScript**: Full TypeScript support with detailed type definitions
 - 🌐 **SSR Compatible**: Server-side rendering friendly
 - 📦 **Tree Shakable**: Optimized bundle size with ES modules
@@ -186,6 +195,11 @@ interface TransformersContextValue {
   analyzeSentiment: (text: string, customModel?: string, options?: any) => Promise<SentimentResult[]>;
   transcribeAudio: (audio: Blob | File, options?: any) => Promise<{ text: string }>;
   
+  // Image Processing
+  segmentImage: (image: string | File | Blob, customModel?: string, options?: any) => Promise<ImageSegmentationResult[]>;
+  captionImage: (image: string | File | Blob, customModel?: string, options?: any) => Promise<ImageCaptionResult[]>;
+  classifyImage: (image: string | File | Blob, customModel?: string, options?: any) => Promise<ImageClassificationResult[]>;
+  
   // Suspense
   readyPromise: Promise<void>;
 }
@@ -339,6 +353,124 @@ The `transcribeAudio` function automatically handles:
 
 Supported audio formats: WAV, MP3, MP4, WebM, OGG, and any format supported by the browser's AudioContext.
 
+### Image Processing
+
+The library provides comprehensive image processing capabilities including segmentation, classification, and captioning.
+
+```tsx
+function ImageProcessingExample() {
+  const { segmentImage, classifyImage, captionImage, libraryStatus } = useTransformers();
+  const [image, setImage] = useState(null);
+  const [results, setResults] = useState({});
+
+  const handleImageUpload = (event) => {
+    const file = event.target.files[0];
+    if (file) {
+      setImage(file);
+      setResults({});
+    }
+  };
+
+  const processImage = async (type) => {
+    if (!image || libraryStatus !== 'ready') return;
+
+    try {
+      let result;
+      switch (type) {
+        case 'segment':
+          // Segment objects in the image
+          result = await segmentImage(image);
+          break;
+        case 'classify':
+          // Classify the image with top 5 results
+          result = await classifyImage(image, 'Xenova/vit-base-patch16-224', { top_k: 5 });
+          break;
+        case 'caption':
+          // Generate a caption for the image
+          result = await captionImage(image);
+          break;
+      }
+      setResults(prev => ({ ...prev, [type]: result }));
+    } catch (error) {
+      console.error(`${type} failed:`, error);
+    }
+  };
+
+  return (
+    <div>
+      <input 
+        type="file" 
+        accept="image/*" 
+        onChange={handleImageUpload}
+        disabled={libraryStatus !== 'ready'}
+      />
+      
+      {image && (
+        <div>
+          <img 
+            src={URL.createObjectURL(image)} 
+            alt="Preview" 
+            style={{ maxWidth: '300px', maxHeight: '300px' }}
+          />
+          
+          <div>
+            <button onClick={() => processImage('segment')}>
+              Segment Objects
+            </button>
+            <button onClick={() => processImage('classify')}>
+              Classify Image
+            </button>
+            <button onClick={() => processImage('caption')}>
+              Generate Caption
+            </button>
+          </div>
+        </div>
+      )}
+      
+      {results.caption && (
+        <div>
+          <h3>Caption:</h3>
+          <p>{results.caption[0].generated_text}</p>
+        </div>
+      )}
+      
+      {results.classify && (
+        <div>
+          <h3>Classification:</h3>
+          {results.classify.map((item, i) => (
+            <div key={i}>
+              {item.label}: {(item.score * 100).toFixed(1)}%
+            </div>
+          ))}
+        </div>
+      )}
+      
+      {results.segment && (
+        <div>
+          <h3>Segmentation:</h3>
+          <p>Found {results.segment.length} objects</p>
+        </div>
+      )}
+    </div>
+  );
+}
+```
+
+#### Image Processing Features
+
+- **Image Segmentation**: Detect and segment objects with mask generation
+  - Default model: `Xenova/detr-resnet-50-panoptic`
+  - Returns: Array of objects with labels, scores, and mask data
+  
+- **Image Classification**: Classify scenes and objects with confidence scores
+  - Default model: `Xenova/vit-base-patch16-224`
+  - Options: `top_k` to limit number of results
+  - Returns: Array of labels with confidence scores
+  
+- **Image Captioning**: Generate descriptive text from images
+  - Default model: `Xenova/vit-gpt2-image-captioning`
+  - Returns: Array of generated text descriptions
+
 ### Model Management
 
 ```tsx
@@ -421,9 +553,15 @@ function AppWithErrorHandling() {
 
 ## 🎭 Examples
 
+### Live Demos
+
+- 🎮 **[Kitchen Sink Demo](https://muhammaddadu.github.io/huggingface-transformers-react/example)** - Interactive showcase featuring sentiment analysis, speech-to-text, image segmentation, image classification, image captioning, and model testing
+
+### Local Examples
+
 Check out our [examples directory](./examples) for complete working examples:
 
-- [Kitchen Sink Demo](./examples/kitchen-sink) - Comprehensive demo showcasing sentiment analysis, audio transcription, and advanced features
+- [Kitchen Sink Demo](./examples/kitchen-sink) - Source code for the comprehensive demo showcasing all library features
 
 ## 🤝 Contributing
 
@@ -439,9 +577,10 @@ We welcome contributions! Please see our [Contributing Guide](./CONTRIBUTING.md)
 
 ## 📚 Documentation
 
-- [API Documentation](https://muhammaddadu.github.io/huggingface-transformers-react)
-- [Hugging Face Transformers.js](https://huggingface.co/docs/transformers.js)
-- [React Context API](https://react.dev/reference/react/useContext)
+- 📖 **[Complete API Documentation](https://muhammaddadu.github.io/huggingface-transformers-react/)** - Full reference guide with examples
+- 🎮 **[Live Interactive Demo](https://muhammaddadu.github.io/huggingface-transformers-react/example)** - Try all features in your browser
+- 🤗 **[Hugging Face Transformers.js](https://huggingface.co/docs/transformers.js)** - Core library documentation
+- ⚛️ **[React Context API](https://react.dev/reference/react/useContext)** - React pattern reference
 
 **Browser Compatibility**
 
