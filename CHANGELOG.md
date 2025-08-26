@@ -1,5 +1,22 @@
-# 1.0.0 (2025-06-10)
+# 1.1.0 (2024-12-19)
 
+### Features
+
+* **image-processing:** Add image segmentation support with interactive demo ([#1](https://github.com/muhammaddadu/huggingface-transformers-react/issues/1))
+* **image-processing:** Add image-to-text (captioning) support with Xenova/vit-gpt2-image-captioning ([#2](https://github.com/muhammaddadu/huggingface-transformers-react/issues/2))
+* **image-processing:** Add image classification support with configurable top-k results ([#3](https://github.com/muhammaddadu/huggingface-transformers-react/issues/3))
+* **demo:** Enhanced kitchen-sink example with comprehensive image processing showcase
+* **types:** Added ImageSegmentationResult, ImageCaptionResult, and ImageClassificationResult interfaces
+* **library:** Added segmentImage, captionImage, and classifyImage methods to useTransformers hook
+
+### Improvements
+
+* **ui:** Responsive grid layout for image processing demos (3-column on large screens)
+* **ui:** Image preview functionality for all image processing tasks
+* **ui:** Raw JSON response display for developer debugging
+* **error-handling:** Improved error handling for image processing failures
+
+# 1.0.0 (2024-06-10)
 
 ### Features
 
