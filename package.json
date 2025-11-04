@@ -1,6 +1,6 @@
 {
   "name": "huggingface-transformers-react",
-  "version": "1.2.0",
+  "version": "1.0.0",
   "type": "module",
   "description": "A React provider and hooks for using Hugging Face Transformers.js in React applications with built-in loading states, error handling, Suspense support, and comprehensive image processing capabilities including segmentation, classification, and captioning",
   "main": "dist/index.js",
