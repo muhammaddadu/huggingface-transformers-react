@@ -5,7 +5,7 @@
  * npm i lucide-react
  */
 
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import {
   TransformersProvider,
   useTransformers,
@@ -13,6 +13,8 @@ import {
   type ImageSegmentationResult,
   type ImageCaptionResult,
   type ImageClassificationResult,
+  type ChatMessage,
+  type WebLLMModelRecord,
 } from 'huggingface-transformers-react';
 import {
   ThemeProvider,
@@ -348,7 +350,16 @@ function ModelTestingCard() {
 }
 
 function LibraryStatusCard() {
-  const { libraryStatus, isLibraryLoaded, models } = useTransformers();
+  const { 
+    libraryStatus, 
+    isLibraryLoaded, 
+    models,
+    isWebLLMEnabled,
+    isWebLLMLoaded,
+    webLLMStatus,
+    currentWebLLMModel,
+    webLLMInitProgress
+  } = useTransformers();
 
   return (
     <Card>
@@ -359,29 +370,84 @@ function LibraryStatusCard() {
           </Avatar>
         }
         title="Runtime Status"
-        subheader="Transformers.js & cached models"
+        subheader="Transformers.js, WebLLM & cached models"
       />
       <CardContent>
-        <Stack direction="row" spacing={1} flexWrap="wrap">
-          <StatusChip status={libraryStatus} label="Library" />
-          <Chip
-            size="small"
-            icon={<Brain size={14} />}
-            label={`Models loaded: ${Object.keys(models).length}`}
-            color="info"
-          />
-          <Chip
-            size="small"
-            icon={
-              isLibraryLoaded ? (
-                <CheckCircleIcon fontSize="small" />
-              ) : (
-                <HourglassIcon fontSize="small" />
-              )
-            }
-            label={isLibraryLoaded ? 'Pipeline ready' : 'Not ready'}
-            color={isLibraryLoaded ? 'success' : 'default'}
-          />
+        <Stack spacing={2}>
+          {/* Transformers Status */}
+          <Box>
+            <Typography variant="subtitle2" gutterBottom>
+              Transformers.js
+            </Typography>
+            <Stack direction="row" spacing={1} flexWrap="wrap">
+              <StatusChip status={libraryStatus} label="Library" />
+              <Chip
+                size="small"
+                icon={<Brain size={14} />}
+                label={`Models loaded: ${Object.keys(models).length}`}
+                color="info"
+              />
+              <Chip
+                size="small"
+                icon={
+                  isLibraryLoaded ? (
+                    <CheckCircleIcon fontSize="small" />
+                  ) : (
+                    <HourglassIcon fontSize="small" />
+                  )
+                }
+                label={isLibraryLoaded ? 'Pipeline ready' : 'Not ready'}
+                color={isLibraryLoaded ? 'success' : 'default'}
+              />
+            </Stack>
+          </Box>
+
+          {/* WebLLM Status */}
+          {isWebLLMEnabled && (
+            <>
+              <Divider />
+              <Box>
+                <Typography variant="subtitle2" gutterBottom>
+                  WebLLM (LLM Runtime)
+                </Typography>
+                <Stack direction="row" spacing={1} flexWrap="wrap" sx={{ mb: 1 }}>
+                  <StatusChip status={webLLMStatus} label="Engine" />
+                  <Chip
+                    size="small"
+                    icon={
+                      isWebLLMLoaded ? (
+                        <CheckCircleIcon fontSize="small" />
+                      ) : (
+                        <HourglassIcon fontSize="small" />
+                      )
+                    }
+                    label={isWebLLMLoaded ? 'Ready' : 'Loading...'}
+                    color={isWebLLMLoaded ? 'success' : 'default'}
+                  />
+                  {currentWebLLMModel && (
+                    <Chip
+                      size="small"
+                      label={`Model: ${currentWebLLMModel}`}
+                      color="primary"
+                      variant="outlined"
+                    />
+                  )}
+                </Stack>
+                {webLLMInitProgress && webLLMStatus === 'loading' && (
+                  <Box sx={{ mt: 1 }}>
+                    <Typography variant="caption" color="text.secondary">
+                      {webLLMInitProgress.text}
+                    </Typography>
+                    <LinearProgress 
+                      variant="determinate" 
+                      value={webLLMInitProgress.progress * 100}
+                      sx={{ mt: 0.5 }}
+                    />
+                  </Box>
+                )}
+              </Box>
+            </>
+          )}
         </Stack>
       </CardContent>
     </Card>
@@ -1142,13 +1208,413 @@ function ImageClassificationCard() {
   );
 }
 
+function WebLLMChatCard() {
+  const { 
+    isWebLLMEnabled,
+    isWebLLMLoaded, 
+    webLLMStatus, 
+    chatCompletion,
+    streamChatCompletion,
+    currentWebLLMModel,
+    loadWebLLMModel,
+    getAvailableWebLLMModels,
+    hasModelInCache
+  } = useTransformers();
+
+  const [messages, setMessages] = useState<Array<{id: string, role: 'user' | 'assistant', content: string, timestamp: Date}>>([
+    { id: '1', role: 'assistant', content: 'Hi! I\'m a large language model running entirely in your browser using WebLLM. Ask me anything!', timestamp: new Date() }
+  ]);
+  const [inputText, setInputText] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [useStreaming, setUseStreaming] = useState(true);
+  const [modelToLoad, setModelToLoad] = useState('Llama-3.2-1B-Instruct-q4f16_1-MLC');
+  const [availableModels, setAvailableModels] = useState<WebLLMModelRecord[]>([]);
+  const [cachedModels, setCachedModels] = useState<Set<string>>(new Set());
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Load available models on mount
+  useEffect(() => {
+    if (isWebLLMEnabled) {
+      getAvailableWebLLMModels().then(models => {
+        // Filter to show popular models
+        const popularModels = models.filter(m => 
+          m.model_id.includes('Llama-3.2') || 
+          m.model_id.includes('Phi-2') ||
+          m.model_id.includes('Mistral-7B') ||
+          m.model_id.includes('gemma-2b')
+        );
+        setAvailableModels(popularModels);
+        
+        // Check which models are cached
+        Promise.all(popularModels.map(m => hasModelInCache(m.model_id)))
+          .then(cached => {
+            const cachedSet = new Set<string>();
+            popularModels.forEach((model, i) => {
+              if (cached[i]) cachedSet.add(model.model_id);
+            });
+            setCachedModels(cachedSet);
+          });
+      });
+    }
+  }, [isWebLLMEnabled, getAvailableWebLLMModels, hasModelInCache]);
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  React.useEffect(() => {
+    scrollToBottom();
+  }, [messages]);
+
+  const handleSendMessage = async () => {
+    if (!inputText.trim() || busy || !isWebLLMLoaded) return;
+
+    const userMessage = {
+      id: Date.now().toString(),
+      role: 'user' as const,
+      content: inputText,
+      timestamp: new Date()
+    };
+
+    setMessages(prev => [...prev, userMessage]);
+    const currentInput = inputText;
+    setInputText('');
+    setBusy(true);
+
+    try {
+      const chatMessages: ChatMessage[] = messages
+        .filter(m => m.role !== 'system')
+        .map(m => ({
+          role: m.role as "user" | "assistant",
+          content: m.content
+        }));
+      chatMessages.push({ role: 'user', content: currentInput });
+
+      if (useStreaming) {
+        // Streaming response
+        const assistantMessageId = (Date.now() + 1).toString();
+        let streamedContent = '';
+
+        setMessages(prev => [...prev, {
+          id: assistantMessageId,
+          role: 'assistant' as const,
+          content: '',
+          timestamp: new Date()
+        }]);
+
+        await streamChatCompletion(
+          chatMessages,
+          (chunk) => {
+            streamedContent += chunk;
+            setMessages(prev => prev.map(m => 
+              m.id === assistantMessageId 
+                ? { ...m, content: streamedContent }
+                : m
+            ));
+          },
+          { temperature: 0.7, max_tokens: 512 }
+        );
+      } else {
+        // Non-streaming response
+        const response = await chatCompletion(chatMessages, {
+          temperature: 0.7,
+          max_tokens: 512
+        });
+
+        const assistantMessage = {
+          id: (Date.now() + 1).toString(),
+          role: 'assistant' as const,
+          content: response.choices[0]?.message?.content || 'No response',
+          timestamp: new Date()
+        };
+
+        setMessages(prev => [...prev, assistantMessage]);
+      }
+    } catch (error: any) {
+      const errorMessage = {
+        id: (Date.now() + 1).toString(),
+        role: 'assistant' as const,
+        content: `❌ Error: ${error.message}`,
+        timestamp: new Date()
+      };
+
+      setMessages(prev => [...prev, errorMessage]);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSendMessage();
+    }
+  };
+
+  const handleLoadModel = async () => {
+    if (!modelToLoad.trim() || busy) return;
+    setBusy(true);
+    try {
+      await loadWebLLMModel(modelToLoad);
+      setMessages([{
+        id: Date.now().toString(),
+        role: 'assistant',
+        content: `Model ${modelToLoad} loaded successfully! How can I help you?`,
+        timestamp: new Date()
+      }]);
+      
+      // Update cached models
+      const isCached = await hasModelInCache(modelToLoad);
+      if (isCached) {
+        setCachedModels(prev => new Set(prev).add(modelToLoad));
+      }
+    } catch (error: any) {
+      setMessages([{
+        id: Date.now().toString(),
+        role: 'assistant',
+        content: `Failed to load model: ${error.message}`,
+        timestamp: new Date()
+      }]);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const formatSize = (mb?: number) => {
+    if (!mb) return 'Unknown size';
+    if (mb < 1024) return `${mb.toFixed(0)} MB`;
+    return `${(mb / 1024).toFixed(1)} GB`;
+  };
+
+  if (!isWebLLMEnabled) {
+    return (
+      <Card sx={{ height: '100%' }}>
+        <CardHeader
+          avatar={
+            <Avatar sx={{ bgcolor: 'warning.main' }}>
+              <MessageSquare size={20} />
+            </Avatar>
+          }
+          title="WebLLM Chat"
+          subheader="Large Language Model running in your browser"
+        />
+        <CardContent>
+          <Paper sx={{ p: 3, textAlign: 'center', bgcolor: 'warning.light', color: 'warning.contrastText' }}>
+            <Typography variant="body1" gutterBottom>
+              WebLLM is not enabled
+            </Typography>
+            <Typography variant="body2">
+              Set <code>enableWebLLM={'{true}'}</code> in TransformersProvider to use this feature
+            </Typography>
+          </Paper>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+      <CardHeader
+        avatar={
+          <Avatar sx={{ bgcolor: 'success.main' }}>
+            <MessageSquare size={20} />
+          </Avatar>
+        }
+        title="WebLLM Chat (Llama 3.2)"
+        subheader="Large Language Model running entirely in your browser"
+      />
+      <CardContent sx={{ flex: 1, display: 'flex', flexDirection: 'column', p: 0 }}>
+        {/* Model Configuration */}
+        <Box sx={{ p: 2, borderBottom: 1, borderColor: 'divider' }}>
+          <Stack spacing={2}>
+            <Stack direction="row" spacing={1}>
+              <Box sx={{ flex: 1 }}>
+                {availableModels.length > 0 ? (
+                  <TextField
+                    fullWidth
+                    select
+                    label="Select Model"
+                    value={modelToLoad}
+                    onChange={(e) => setModelToLoad(e.target.value)}
+                    disabled={busy || webLLMStatus === 'loading'}
+                    variant="outlined"
+                    size="small"
+                    SelectProps={{
+                      native: true,
+                    }}
+                  >
+                    {availableModels.map((model) => {
+                      const isCached = cachedModels.has(model.model_id);
+                      const size = formatSize(model.vram_required_MB);
+                      return (
+                        <option key={model.model_id} value={model.model_id}>
+                          {model.model_id.split('-').slice(0, 3).join('-')} - {size} {isCached ? '✓ Cached' : ''}
+                        </option>
+                      );
+                    })}
+                  </TextField>
+                ) : (
+                  <TextField
+                    fullWidth
+                    label="Model ID"
+                    placeholder="e.g., Phi-2-q4f16_1-MLC"
+                    value={modelToLoad}
+                    onChange={(e) => setModelToLoad(e.target.value)}
+                    disabled={busy || webLLMStatus === 'loading'}
+                    variant="outlined"
+                    size="small"
+                  />
+                )}
+              </Box>
+              <Button
+                variant="outlined"
+                onClick={handleLoadModel}
+                disabled={!modelToLoad.trim() || busy || webLLMStatus === 'loading'}
+                sx={{ minWidth: 'auto', px: 2 }}
+              >
+                Load
+              </Button>
+            </Stack>
+            <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
+              <Typography variant="caption" color="text.secondary">
+                Streaming:
+              </Typography>
+              <Chip
+                size="small"
+                label={useStreaming ? 'ON' : 'OFF'}
+                color={useStreaming ? 'success' : 'default'}
+                onClick={() => setUseStreaming(!useStreaming)}
+                sx={{ cursor: 'pointer' }}
+              />
+              {currentWebLLMModel && (
+                <>
+                  <Chip
+                    size="small"
+                    label={`Current: ${currentWebLLMModel.split('-').slice(0, 3).join('-')}`}
+                    color="primary"
+                    variant="outlined"
+                  />
+                  {(() => {
+                    const currentModelInfo = availableModels.find(m => m.model_id === currentWebLLMModel);
+                    if (currentModelInfo?.vram_required_MB) {
+                      return (
+                        <Chip
+                          size="small"
+                          label={`Size: ${formatSize(currentModelInfo.vram_required_MB)}`}
+                          color="info"
+                          variant="outlined"
+                        />
+                      );
+                    }
+                    return null;
+                  })()}
+                </>
+              )}
+            </Stack>
+          </Stack>
+        </Box>
+
+        {/* Messages area */}
+        <Box
+          sx={{
+            flex: 1,
+            overflowY: 'auto',
+            p: 2,
+            maxHeight: 500,
+            minHeight: 350,
+          }}
+        >
+          {messages.map((message) => (
+            <Box
+              key={message.id}
+              sx={{
+                display: 'flex',
+                justifyContent: message.role === 'user' ? 'flex-end' : 'flex-start',
+                mb: 2,
+              }}
+            >
+              <Paper
+                sx={{
+                  p: 1.5,
+                  maxWidth: '85%',
+                  bgcolor: message.role === 'user' ? 'success.main' : 'grey.100',
+                  color: message.role === 'user' ? 'white' : 'text.primary',
+                  borderRadius: message.role === 'user' ? '16px 16px 4px 16px' : '16px 16px 16px 4px',
+                }}
+              >
+                <Typography 
+                  variant="body2" 
+                  sx={{ 
+                    wordBreak: 'break-word',
+                    whiteSpace: 'pre-wrap'
+                  }}
+                >
+                  {message.content}
+                </Typography>
+                <Typography
+                  variant="caption"
+                  sx={{
+                    opacity: 0.7,
+                    display: 'block',
+                    textAlign: 'right',
+                    mt: 0.5,
+                  }}
+                >
+                  {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </Typography>
+              </Paper>
+            </Box>
+          ))}
+          {busy && (
+            <Box sx={{ display: 'flex', justifyContent: 'flex-start', mb: 2 }}>
+              <Paper sx={{ p: 1.5, bgcolor: 'grey.100', borderRadius: '16px 16px 16px 4px' }}>
+                <Stack direction="row" spacing={1} alignItems="center">
+                  <Typography variant="body2">Thinking...</Typography>
+                  <LinearProgress sx={{ width: 100, height: 4 }} />
+                </Stack>
+              </Paper>
+            </Box>
+          )}
+          <div ref={messagesEndRef} />
+        </Box>
+
+        {/* Input area */}
+        <Box sx={{ p: 2, borderTop: 1, borderColor: 'divider' }}>
+          <Stack direction="row" spacing={1}>
+            <TextField
+              fullWidth
+              multiline
+              maxRows={4}
+              placeholder={isWebLLMLoaded ? "Type your message..." : "Loading WebLLM engine..."}
+              value={inputText}
+              onChange={(e) => setInputText(e.target.value)}
+              onKeyPress={handleKeyPress}
+              disabled={busy || !isWebLLMLoaded}
+              variant="outlined"
+              size="small"
+            />
+            <Button
+              variant="contained"
+              onClick={handleSendMessage}
+              disabled={!inputText.trim() || busy || !isWebLLMLoaded}
+              sx={{ minWidth: 'auto', px: 2 }}
+            >
+              <Sparkles size={16} />
+            </Button>
+          </Stack>
+        </Box>
+      </CardContent>
+    </Card>
+  );
+}
+
 /* ─────────────────────────── App ──────────────────────────── */
 
 export function App() {
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
-      <TransformersProvider>
+      <TransformersProvider enableWebLLM={true}>
         {/* App Bar */}
         <AppBar
           position="static"
@@ -1174,8 +1640,8 @@ export function App() {
             >
               AI-powered React Components
             </Typography>
-            <Typography variant="h6" color="text.secondary" maxWidth={600} mx="auto">
-              Showcase of sentiment analysis, speech-to-text, image segmentation, image captioning, image classification & AI model testing
+            <Typography variant="h6" color="text.secondary" maxWidth={700} mx="auto">
+              Showcase of sentiment analysis, speech-to-text, image processing, WebLLM chat, and AI model testing - all running in your browser!
             </Typography>
           </Box>
 
@@ -1203,9 +1669,14 @@ export function App() {
             <Grid item xs={12} md={6} lg={4}>
               <ImageClassificationCard />
             </Grid>
+
+            {/* WebLLM Chat */}
+            <Grid item xs={12} lg={6}>
+              <WebLLMChatCard />
+            </Grid>
             
             {/* Model Testing */}
-            <Grid item xs={12}>
+            <Grid item xs={12} lg={6}>
               <ModelTestingCard />
             </Grid>
           </Grid>

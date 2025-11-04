@@ -1,11 +1,23 @@
 {
   "name": "huggingface-transformers-react",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "type": "module",
   "description": "A React provider and hooks for using Hugging Face Transformers.js in React applications with built-in loading states, error handling, Suspense support, and comprehensive image processing capabilities including segmentation, classification, and captioning",
   "main": "dist/index.js",
   "module": "dist/index.esm.js",
   "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.esm.js"
+      },
+      "require": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      }
+    }
+  },
   "files": [
     "dist",
     "README.md",
@@ -22,7 +34,7 @@
     "prepublishOnly": "npm run build && npm run test && npm run lint",
     "docs:dev": "typedoc --watch",
     "docs:build": "typedoc && npm run build:examples && mv examples/kitchen-sink/dist docs/example",
-    "build:examples": "cd examples/kitchen-sink && npm i && npm run build && cd ../..",
+    "build:examples": "npm run build && cd examples/kitchen-sink && npm i && npm run build && cd ../..",
     "release": "semantic-release"
   },
   "keywords": [

@@ -24,12 +24,21 @@ A React provider and hooks for seamlessly integrating [Hugging Face Transformers
   - **Image Segmentation**: Object detection and segmentation with mask generation
   - **Image Classification**: Classify objects and scenes with confidence scores
   - **Image Captioning**: Generate descriptive text from images
+- 🤖 **WebLLM Support**: Run large language models in the browser (loaded from CDN)
+  - **Llama 3.2, Phi-2, Mistral**: Support for popular LLM models
+  - **Streaming Chat**: Real-time token streaming for chat completions
+  - **Model Management**: Load, switch, and cache models on the fly
+  - **WebGPU Acceleration**: Fast inference using GPU in the browser
+  - **Privacy-First**: All processing happens locally, no backend required
+  - **Zero Dependencies**: Loaded dynamically from CDN, no npm package needed
 - 🔒 **TypeScript**: Full TypeScript support with detailed type definitions
 - 🌐 **SSR Compatible**: Server-side rendering friendly
 - 📦 **Tree Shakable**: Optimized bundle size with ES modules
 - 🎛️ **Configurable**: Customizable loading timeouts, retry logic, and more
 
 ## 📦 Installation
+
+### Basic Installation
 
 ```bash
 npm install huggingface-transformers-react
@@ -42,6 +51,20 @@ yarn add huggingface-transformers-react
 ```bash
 pnpm add huggingface-transformers-react
 ```
+
+### With WebLLM Support (Optional)
+
+WebLLM support is built-in and loaded automatically from CDN when enabled - no additional installation required!
+
+Simply set `enableWebLLM={true}` in the TransformersProvider:
+
+```tsx
+<TransformersProvider enableWebLLM={true}>
+  <App />
+</TransformersProvider>
+```
+
+**Note:** WebLLM requires a WebGPU-capable browser (Chrome/Edge 113+ recommended)
 
 ## 🚀 Quick Start
 
